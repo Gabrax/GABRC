@@ -20,12 +20,16 @@ int main()
 
     // Read HTML file
     FILE *html;
-    html = fopen("index.html","r");
+    html = fopen("/home/gabrax/Desktop/github/HTTP_Server/Website/index.html", "r");
+    if(html == NULL) {
+        perror("Error opening html");
+        exit(EXIT_FAILURE); 
+    }
 
     char response[1024];
     fgets(response,1024,html);
 
-    char http_header[2048] = "HTTP/1.1 200 OK\r\n\n";
+    char http_header[2048] = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n";
     strcat(http_header, response);
 
     if((server_socket = socket(AF_INET,SOCK_STREAM,0)) == 0){

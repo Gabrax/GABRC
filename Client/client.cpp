@@ -14,7 +14,9 @@ int main()
 {
     int sock = 0; 
     struct sockaddr_in serv_adrr;
+
     std::string hello = "Hello from client\n";
+
     char buffer[1024] = {0};
     if((sock = socket(AF_INET, SOCK_STREAM,0)) < 0){
         puts("\n Socket creation error \n");
@@ -30,6 +32,7 @@ int main()
         puts("\nInvalid address/ Address not supported \n");
         return -1;
     }
+    
     if(connect(sock,(struct sockaddr *)&serv_adrr, sizeof(serv_adrr)) < 0){
         puts("\n Connection failed \n");
         return -1;
