@@ -42,7 +42,7 @@ int main()
     address.sin_port = htons(port);
     address.sin_addr.s_addr = INADDR_ANY;
 
-    //std::memset(address.sin_zero, '\0', sizeof address.sin_zero);
+    std::memset(address.sin_zero, '\0', sizeof address.sin_zero);
 
     if(bind(server_socket, (struct sockaddr *) &address, sizeof(address)) < 0){
         perror("Bind error");
@@ -63,12 +63,17 @@ int main()
             exit(EXIT_FAILURE);
         }
 
+        char buffer[30000] = {0};
+        #pragma GCC diagnostic ignored "-Wunused-variable"
+        long long valread = read(client_socket,buffer,sizeof(buffer));
+        std::cout << buffer << '\n';    
 
         if(send(client_socket,http_header,sizeof(http_header), 0) < 0){
             perror("Send failed");
+        }else{
+            puts("------------ HTML Sent ------------\n");
         }
 
-        puts("------------HTML Sent------------\n");
         close(client_socket);
     }
 
