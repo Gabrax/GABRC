@@ -10,12 +10,15 @@
 #include <netinet/in.h>
 #include <sys/types.h>
 
+#include "server_init.h"
+#include "routing.h"
+
 #define port 2137
 
 int main()
 {
-
-    int server_socket, client_socket; 
+    HTTP_Server server;
+    init(&server,port);
     
 
     // Read HTML file
@@ -32,33 +35,17 @@ int main()
     char http_header[2048] = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n";
     strcat(http_header, response);
 
-    if((server_socket = socket(AF_INET,SOCK_STREAM,0)) == 0){
-        perror("Socket error");
-        exit(EXIT_FAILURE);
-    }
-
-    struct sockaddr_in address;
-    address.sin_family = AF_INET;
-    address.sin_port = htons(port);
-    address.sin_addr.s_addr = INADDR_ANY;
-
-    std::memset(address.sin_zero, '\0', sizeof address.sin_zero);
-
-    if(bind(server_socket, (struct sockaddr *) &address, sizeof(address)) < 0){
-        perror("Bind error");
-        exit(EXIT_FAILURE);
-    }
-    if(listen(server_socket, 5) < 0){
-        perror("Listen error");
-        exit(EXIT_FAILURE);
-    }
+    std::shared_ptr<Route> route = initRoute("/", "index.html");
+    route = addRoute(route, "/yoo", "yoo.html");
+    inorder(route);
 
     //int addrlen = sizeof(address);
+    int client_socket; 
     while (1)
     {
         puts("\n--------- Waiting for connection ---------\n\n");
         
-        if((client_socket = accept(server_socket,NULL,NULL)) < 0){
+        if((client_socket = accept(server.server_socket,NULL,NULL)) < 0){
             perror("Accepting failed");
             exit(EXIT_FAILURE);
         }
