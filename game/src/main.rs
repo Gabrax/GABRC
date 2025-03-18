@@ -1,3 +1,5 @@
+use ::core::f32;
+
 use raylib::prelude::*;
 
 const SCREEN_WIDTH: i32 = 800;
@@ -60,7 +62,7 @@ fn verline(d: &mut RaylibDrawHandle, x: i32, y0: i32, y1: i32, color: Color) {
     }
 }
 
-fn render(d: &mut RaylibDrawHandle, player: &Player) {
+fn render(d: &mut RaylibDrawHandle, player: &Player, textures: &[Texture2D]) {
     for x in 0..SCREEN_WIDTH {
         let xcam = 2.0 * (x as f32) / SCREEN_WIDTH as f32 - 1.0;
 
@@ -115,31 +117,82 @@ fn render(d: &mut RaylibDrawHandle, player: &Player) {
             hit.0 = MAPDATA[map_y as usize * MAP_SIZE + map_x as usize] as i32;
         }
 
-        let mut color = Color::BLACK;
+        let _color = Color::BLACK;
+        let texture = match hit.0 {
+            1 => &textures[0], 
+            2 => &textures[1], 
+            3 => &textures[2], 
+            4 => &textures[2], 
+            _ => &textures[0], 
+        };
 
-        match hit.0 {
-            1 => color = Color::RED,
-            2 => color = Color::GREEN,
-            3 => color = Color::BLUE,
-            4 => color = Color::MAGENTA,
-            _ => {}
-        }
-
-        if hit.1 == 1 {
-            color.r = (color.r as f32 * 0.8) as u8;
-            color.g = (color.g as f32 * 0.8) as u8;
-        }
-
+        // Calculate the position on the texture
         let dperp = if hit.1 == 0 { sidedist.x - deltadist.x } else { sidedist.y - deltadist.y };
+        let hit_pos = pos + dir * dperp;
+        let mut tex_x = 0.0;
+        
+        if hit.1 == 0 {
+            tex_x = hit_pos.y - hit_pos.y.floor();
+        } else {
+            tex_x = hit_pos.x - hit_pos.x.floor();
+        }
 
+        if (hit.1 == 0 && dir.x > 0.0) || (hit.1 == 1 && dir.y < 0.0) {
+            tex_x = 1.0 - tex_x;
+        }
+
+        let tex_x = (tex_x * texture.width() as f32) as i32;
+
+        // Calculate the height of the wall slice
         let h = (SCREEN_HEIGHT as f32 / dperp) as i32;
         let y0 = ((SCREEN_HEIGHT / 2) - (h / 2)).max(0);
         let y1 = ((SCREEN_HEIGHT / 2) + (h / 2)).min(SCREEN_HEIGHT - 1);
 
-        verline(d, x, 0, y0, Color::new(32, 32, 32, 255));
-        verline(d, x, y0, y1, color);
-        verline(d, x, y1, SCREEN_HEIGHT - 1, Color::new(80, 80, 80, 255));
+        // Draw the wall slice
+        d.draw_texture_pro(
+            texture,
+            Rectangle::new(tex_x as f32, 0.0, 1.0, texture.height() as f32),
+            Rectangle::new(x as f32, y0 as f32, 1.0, (y1 - y0) as f32),
+            Vector2::new(0.0, 0.0),
+            0.0,
+            Color::WHITE,
+        );
     }
+}
+fn draw_board(d: &mut RaylibDrawHandle, _player: &Player) {
+    let tile_size = 20; // You can adjust this size as per your needs
+    let mut y_offset = 0; // This will keep track of the vertical position to draw each row
+
+    for row in 0..MAP_SIZE {
+        let mut x_offset = 0; // Reset the horizontal position for each row
+
+        for col in 0..MAP_SIZE {
+            let value = MAPDATA[row * MAP_SIZE + col];
+
+            // Determine the symbol for this tile
+            let symbol = match value {
+                1 => '#',  // Wall
+                0 => '.',  // Empty space
+                2 => 'O',  // Special object
+                3 => 'X',  // Another special object
+                4 => '@',  // Another type of object
+                _ => ' ',  // Default empty character
+            };
+
+            let position_text = format!("{}", symbol);
+            // Draw each symbol at the calculated position
+            d.draw_text(&position_text, x_offset, y_offset, 6, Color::RAYWHITE);
+
+            x_offset += tile_size; // Move horizontally for the next symbol
+        }
+
+        y_offset += tile_size; // Move vertically for the next row
+    }
+
+    // Now, draw the player on top of the board
+    let player_x_offset = _player.pos.x as i32 * tile_size;
+    let player_y_offset = _player.pos.y as i32 * tile_size;
+    d.draw_text("P", player_x_offset, player_y_offset, 6, Color::RED);  // Draw 'P' for the player
 }
 
 fn main() {
@@ -149,9 +202,22 @@ fn main() {
         .vsync()
         .build();
 
+    rl.disable_cursor();
+
     let mut player = Player::new();
 
-    rl.disable_cursor();
+    let texture_files = [
+        "res/greystone.png",
+        "res/wood.png",
+        "res/mossy.png",
+    ];
+
+    // Load textures into a vector
+    let _textures: Vec<Texture2D> = texture_files
+        .iter()
+        .map(|&path| rl.load_texture(&thread, path).expect("Failed to load texture"))
+        .collect();
+
     while !rl.window_should_close() {
         let mut d = rl.begin_drawing(&thread);
 
@@ -178,8 +244,7 @@ fn main() {
         }
 
         d.clear_background(Color::WHITE);
-        render(&mut d, &player);
-        let position_text = format!("Position: {}: {}", player.pos.x as i32, player.pos.y as i32);
-        d.draw_text(&position_text, 0, 0, 6, Color::RAYWHITE);
+        render(&mut d, &player,&_textures);
+        draw_board(&mut d, &player);
     }
 }
