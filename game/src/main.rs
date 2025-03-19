@@ -121,6 +121,7 @@ fn render(d: &mut RaylibDrawHandle, player: &Player, textures: &[Texture2D]) {
 
     // Wall rendering 
     for x in 0..SCREEN_WIDTH {
+        // Calculate ray direction
         let xcam = 2.0 * (x as f32) / SCREEN_WIDTH as f32 - 1.0;
         let dir = Vector2::new(
             player.dir.x + player.projection.x * xcam,
@@ -130,11 +131,13 @@ fn render(d: &mut RaylibDrawHandle, player: &Player, textures: &[Texture2D]) {
         let pos = player.pos;
         let mut ipos = Vector2::new(pos.x.floor(), pos.y.floor());
 
+        // Delta distance (avoid division by zero)
         let deltadist = Vector2::new(
             if dir.x.abs() < 1e-20 { 1e30 } else { 1.0 / dir.x.abs() },
             if dir.y.abs() < 1e-20 { 1e30 } else { 1.0 / dir.y.abs() },
         );
 
+        // Side distances
         let mut sidedist = Vector2::new(
             if dir.x < 0.0 { (pos.x - ipos.x) * deltadist.x } else { (ipos.x + 1.0 - pos.x) * deltadist.x },
             if dir.y < 0.0 { (pos.y - ipos.y) * deltadist.y } else { (ipos.y + 1.0 - pos.y) * deltadist.y },
@@ -143,15 +146,16 @@ fn render(d: &mut RaylibDrawHandle, player: &Player, textures: &[Texture2D]) {
         let step = Vector2::new(dir.x.signum(), dir.y.signum());
         let mut hit = (0, 0, Vector2::new(0.0, 0.0));
 
+        // DDA (Raycasting Loop)
         while hit.0 == 0 {
             if sidedist.x < sidedist.y {
                 sidedist.x += deltadist.x;
                 ipos.x += step.x;
-                hit.1 = 0;
+                hit.1 = 0; // Hit vertical wall
             } else {
                 sidedist.y += deltadist.y;
                 ipos.y += step.y;
-                hit.1 = 1;
+                hit.1 = 1; // Hit horizontal wall
             }
 
             let map_x = ipos.x as i32;
@@ -164,6 +168,7 @@ fn render(d: &mut RaylibDrawHandle, player: &Player, textures: &[Texture2D]) {
             hit.0 = MAPDATA[map_y as usize * MAP_SIZE + map_x as usize] as i32;
         }
 
+        // Select texture based on wall type
         let texture = match hit.0 {
             1 => &textures[0], 
             2 => &textures[4], 
@@ -172,34 +177,48 @@ fn render(d: &mut RaylibDrawHandle, player: &Player, textures: &[Texture2D]) {
             _ => &textures[0], 
         };
 
+        // Calculate perpendicular distance (fix fisheye effect)
         let dperp = if hit.1 == 0 { sidedist.x - deltadist.x } else { sidedist.y - deltadist.y };
+
+        // Hit position in world
         let hit_pos = pos + dir * dperp;
-        let mut tex_x = 0.0;
-
-        if hit.1 == 0 {
-            tex_x = hit_pos.y - hit_pos.y.floor();
+        
+        // Corrected texture coordinate
+        let mut tex_x = if hit.1 == 0 {
+            hit_pos.y - hit_pos.y.floor()
         } else {
-            tex_x = hit_pos.x - hit_pos.x.floor();
-        }
+            hit_pos.x - hit_pos.x.floor()
+        };
 
+        // Flip texture for correct orientation
         if (hit.1 == 0 && dir.x > 0.0) || (hit.1 == 1 && dir.y < 0.0) {
             tex_x = 1.0 - tex_x;
         }
 
         let tex_x = (tex_x * texture.width() as f32) as i32;
 
+        // Calculate wall height on screen
         let h = (SCREEN_HEIGHT as f32 / dperp) as i32;
         let y0 = ((SCREEN_HEIGHT / 2) - (h / 2)).max(0);
         let y1 = ((SCREEN_HEIGHT / 2) + (h / 2)).min(SCREEN_HEIGHT - 1);
 
-        d.draw_texture_pro(
-            texture,
-            Rectangle::new(tex_x as f32, 0.0, 1.0, texture.height() as f32),
-            Rectangle::new(x as f32, y0 as f32, 1.0, (y1 - y0) as f32),
-            Vector2::new(0.0, 0.0),
-            0.0,
-            Color::WHITE,
-        );
+        // Texture scaling fix (prevents stretching)
+        let step = texture.height() as f32 / h as f32;
+        let mut tex_pos = (y0 as f32 - SCREEN_HEIGHT as f32 / 2.0 + h as f32 / 2.0) * step;
+
+        for y in y0..y1 {
+            let tex_y = (tex_pos as i32) & (texture.height() - 1);
+            tex_pos += step;
+
+            d.draw_texture_pro(
+                texture,
+                Rectangle::new(tex_x as f32, tex_y as f32, 1.0, 1.0),
+                Rectangle::new(x as f32, y as f32, 1.0, 1.0),
+                Vector2::new(0.0, 0.0),
+                0.0,
+                Color::WHITE,
+            );
+        }
     }
 }
 
@@ -300,5 +319,6 @@ fn main() {
         d.clear_background(Color::WHITE);
         render(&mut d, &player,&_textures);
         draw_board(&mut d, &player);
+        d.draw_fps(15, 0);
     }
 }
