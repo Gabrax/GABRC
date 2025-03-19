@@ -62,10 +62,66 @@ fn verline(d: &mut RaylibDrawHandle, x: i32, y0: i32, y1: i32, color: Color) {
     }
 }
 
+
 fn render(d: &mut RaylibDrawHandle, player: &Player, textures: &[Texture2D]) {
+    let floor_texture = &textures[1]; 
+    let ceiling_texture = &textures[5]; 
+    
+    // Floor/Ceiling rendering
+    for y in 0..SCREEN_HEIGHT {
+        let is_floor = y > SCREEN_HEIGHT / 2; // Floor or ceiling?
+
+        // Use positive camera height for floor, negative for ceiling
+        let camera_z = if is_floor {
+            0.5 * SCREEN_HEIGHT as f32  // Floor
+        } else {
+            -0.5 * SCREEN_HEIGHT as f32 // Ceiling (flipped perspective)
+        };
+
+        let p = y as f32 - SCREEN_HEIGHT as f32 / 2.0;
+        if p == 0.0 {
+            continue; // Avoid division by zero
+        }
+
+        let row_distance = camera_z / p; // Different for ceiling
+
+        let ray_dir_x0 = player.dir.x - player.projection.x;
+        let ray_dir_y0 = player.dir.y - player.projection.y;
+        let ray_dir_x1 = player.dir.x + player.projection.x;
+        let ray_dir_y1 = player.dir.y + player.projection.y;
+
+        let floor_step_x = row_distance * (ray_dir_x1 - ray_dir_x0) / SCREEN_WIDTH as f32;
+        let floor_step_y = row_distance * (ray_dir_y1 - ray_dir_y0) / SCREEN_WIDTH as f32;
+
+        let mut floor_x = player.pos.x + row_distance * ray_dir_x0;
+        let mut floor_y = player.pos.y + row_distance * ray_dir_y0;
+
+        let texture = if is_floor { floor_texture } else { ceiling_texture };
+
+        for x in 0..SCREEN_WIDTH {
+            let cell_x = floor_x as i32;
+            let cell_y = floor_y as i32;
+
+            let tex_x = ((floor_x - cell_x as f32) * texture.width() as f32) as i32;
+            let tex_y = ((floor_y - cell_y as f32) * texture.height() as f32) as i32;
+
+            floor_x += floor_step_x;
+            floor_y += floor_step_y;
+
+            d.draw_texture_pro(
+                texture,
+                Rectangle::new(tex_x as f32, tex_y as f32, 1.0, 1.0), 
+                Rectangle::new(x as f32, y as f32, 1.0, 1.0), 
+                Vector2::new(0.0, 0.0),
+                0.0,
+                Color::WHITE,
+            );
+        }
+    }
+
+    // Wall rendering 
     for x in 0..SCREEN_WIDTH {
         let xcam = 2.0 * (x as f32) / SCREEN_WIDTH as f32 - 1.0;
-
         let dir = Vector2::new(
             player.dir.x + player.projection.x * xcam,
             player.dir.y + player.projection.y * xcam,
@@ -80,20 +136,11 @@ fn render(d: &mut RaylibDrawHandle, player: &Player, textures: &[Texture2D]) {
         );
 
         let mut sidedist = Vector2::new(
-            if dir.x < 0.0 { 
-                (pos.x - ipos.x) * deltadist.x
-            } else { 
-                (ipos.x + 1.0 - pos.x) * deltadist.x 
-            },
-            if dir.y < 0.0 { 
-                (pos.y - ipos.y) * deltadist.y
-            } else { 
-                (ipos.y + 1.0 - pos.y) * deltadist.y 
-            },
+            if dir.x < 0.0 { (pos.x - ipos.x) * deltadist.x } else { (ipos.x + 1.0 - pos.x) * deltadist.x },
+            if dir.y < 0.0 { (pos.y - ipos.y) * deltadist.y } else { (ipos.y + 1.0 - pos.y) * deltadist.y },
         );
 
         let step = Vector2::new(dir.x.signum(), dir.y.signum());
-
         let mut hit = (0, 0, Vector2::new(0.0, 0.0));
 
         while hit.0 == 0 {
@@ -117,20 +164,18 @@ fn render(d: &mut RaylibDrawHandle, player: &Player, textures: &[Texture2D]) {
             hit.0 = MAPDATA[map_y as usize * MAP_SIZE + map_x as usize] as i32;
         }
 
-        let _color = Color::BLACK;
         let texture = match hit.0 {
             1 => &textures[0], 
-            2 => &textures[1], 
-            3 => &textures[2], 
+            2 => &textures[4], 
+            3 => &textures[7], 
             4 => &textures[2], 
             _ => &textures[0], 
         };
 
-        // Calculate the position on the texture
         let dperp = if hit.1 == 0 { sidedist.x - deltadist.x } else { sidedist.y - deltadist.y };
         let hit_pos = pos + dir * dperp;
         let mut tex_x = 0.0;
-        
+
         if hit.1 == 0 {
             tex_x = hit_pos.y - hit_pos.y.floor();
         } else {
@@ -143,12 +188,10 @@ fn render(d: &mut RaylibDrawHandle, player: &Player, textures: &[Texture2D]) {
 
         let tex_x = (tex_x * texture.width() as f32) as i32;
 
-        // Calculate the height of the wall slice
         let h = (SCREEN_HEIGHT as f32 / dperp) as i32;
         let y0 = ((SCREEN_HEIGHT / 2) - (h / 2)).max(0);
         let y1 = ((SCREEN_HEIGHT / 2) + (h / 2)).min(SCREEN_HEIGHT - 1);
 
-        // Draw the wall slice
         d.draw_texture_pro(
             texture,
             Rectangle::new(tex_x as f32, 0.0, 1.0, texture.height() as f32),
@@ -159,6 +202,8 @@ fn render(d: &mut RaylibDrawHandle, player: &Player, textures: &[Texture2D]) {
         );
     }
 }
+
+
 fn draw_board(d: &mut RaylibDrawHandle, _player: &Player) {
     let tile_size = 20; // You can adjust this size as per your needs
     let mut y_offset = 0; // This will keep track of the vertical position to draw each row
@@ -205,11 +250,20 @@ fn main() {
     rl.disable_cursor();
 
     let mut player = Player::new();
+    player.rotate(180.0);
 
     let texture_files = [
         "res/greystone.png",
         "res/wood.png",
         "res/mossy.png",
+        "res/purplestone.png",
+        "res/redbrick.png",
+        "res/colorstone.png",
+        "res/bluestone.png",
+        "res/eagle.png",
+        "res/barrel.png",
+        "res/pillar.png",
+        "res/greenlight.png"
     ];
 
     // Load textures into a vector
