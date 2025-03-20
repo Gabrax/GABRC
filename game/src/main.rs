@@ -39,9 +39,9 @@ fn main() {
         "res/chomik.png",
     ];
 
-    let textures: Vec<Rc<Texture2D>> = texture_files
+    let textures: Vec<Rc<RefCell<Image>>> = texture_files
         .iter()
-        .map(|&path| Rc::new(rl.load_texture(&thread, path).expect("Failed to load texture")))
+        .map(|&path| Rc::new(RefCell::new(Image::load_image(path).expect("Failed to load texture"))))
         .collect();
 
     let game_map = Rc::new(RefCell::new(GameMap::load_from_file("res/level_1.txt")));
@@ -53,16 +53,14 @@ fn main() {
         SCREEN_HEIGHT,
         Rc::clone(&player),
         textures,
-        Rc::clone(&game_map)
+        Rc::clone(&game_map),
     );
 
     while !rl.window_should_close() {
         let mut d = rl.begin_drawing(&thread);
 
-        d.clear_background(Color::WHITE);
-
-        player.borrow_mut().update(&mut d);
         raycaster.render_all(&mut d);
+        player.borrow_mut().update(&mut d);
 
         draw_board(&mut d, &player.borrow(), &game_map.borrow());
         d.draw_fps(15, 0);
