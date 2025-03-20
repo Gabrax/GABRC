@@ -1,6 +1,7 @@
 use raylib::ffi::UnloadImage;
 use raylib::prelude::*;
 
+use std::fmt;
 use std::rc::Rc;
 use std::cell::RefCell;
 mod player;
@@ -16,42 +17,65 @@ use raycaster::Raycaster;
 const SCREEN_WIDTH: i32 = 800;
 const SCREEN_HEIGHT: i32 = 600;
 
-
 fn main() {
+
+    let _map: Vec<u8> = vec![
+        1, 1, 1, 1, 1, 1, 1, 1,
+        1, 0, 0, 0, 0, 0, 0, 1,
+        1, 0, 0, 0, 0, 3, 0, 1,
+        1, 0, 0, 0, 0, 0, 0, 1,
+        1, 0, 2, 0, 4, 4, 0, 1,
+        1, 0, 0, 0, 4, 0, 0, 1,
+        1, 0, 2, 0, 0, 0, 0, 1,
+        1, 1, 1, 1, 1, 1, 1, 1,
+    ];
 
     let (mut rl, thread) = raylib::init()
         .size(SCREEN_WIDTH, SCREEN_HEIGHT)
-        .title("raylib [shaders] example - texture drawing")
+        .title("GPU Raycast")
+        .vsync()
         .build();
+    //rl.set_target_fps(60);
+    rl.disable_cursor();
 
-    let mut _shader = rl.load_shader(
-                &thread,
-                None,
-                Some(
-                    "res/base.glsl"
-                ),
-            )
-            .unwrap();
+    let mut _shader = rl.load_shader(&thread,None,Some("res/base.glsl"),).unwrap();
 
-    let _time_loc = _shader.get_shader_location("time");
+    let _map_loc = _shader.get_shader_location("mapData");
+    let _player_pos_x_loc = _shader.get_shader_location("player_pos_x");
+    let _player_pos_y_loc = _shader.get_shader_location("player_pos_y");
+    let _player_dir_x_loc = _shader.get_shader_location("player_dir_x");
+    let _player_dir_y_loc = _shader.get_shader_location("player_dir_y");
+    let _player_proj_x_loc = _shader.get_shader_location("player_proj_x");
+    let _player_proj_y_loc = _shader.get_shader_location("player_proj_x");
 
-    let mut target = rl
-        .load_render_texture(&thread, SCREEN_WIDTH as u32, SCREEN_HEIGHT as u32)
-        .unwrap();
+    let _map_f32: Vec<f32> = _map.iter().map(|&v| v as f32).collect();
 
+    let mut target = rl.load_render_texture(&thread, SCREEN_WIDTH as u32, SCREEN_HEIGHT as u32).unwrap();
 
-    rl.set_target_fps(60); // Set our game to run at 60 frames-per-second
-
+    let mut _player = Player::new();
 
     while !rl.window_should_close()
     {
         let mut d = rl.begin_drawing(&thread);
 
-        _shader.set_shader_value(_time_loc, d.get_time() as f32);
+
+        _player.update(&mut d);
+
+        //println!("{}", _player.dir.x);
+
+        _shader.set_shader_value_v(_map_loc, &_map_f32);
+        _shader.set_shader_value(_player_pos_x_loc, _player.pos.x);
+        _shader.set_shader_value(_player_pos_y_loc, _player.pos.y);
+        _shader.set_shader_value(_player_dir_x_loc, _player.dir.x);
+        _shader.set_shader_value(_player_dir_y_loc, _player.dir.x);
+        _shader.set_shader_value(_player_proj_x_loc, _player.projection.x);
+        _shader.set_shader_value(_player_proj_y_loc, _player.projection.x);
+
+
         {
             let mut d = d.begin_texture_mode(&thread, &mut target); // Enable drawing to texture
 
-            d.clear_background(Color::RAYWHITE); // Clear texture background
+            //d.clear_background(Color::RAYWHITE); 
             {
 
             }
@@ -70,7 +94,6 @@ fn main() {
 
         d.draw_fps(700, 15);
     }
-
 }
 
 //fn main() {
