@@ -47,7 +47,7 @@ fn main() {
 
     let game_map = Rc::new(RefCell::new(GameMap::load_from_file("res/level_1.txt")));
 
-    let player = Rc::new(RefCell::new(Player::new()));
+    let player = Rc::new(RefCell::new(Player::new(game_map.clone())));
     let _framebuffer = rl
     .load_render_texture(&thread, BUFFER_WIDTH as u32, BUFFER_HEIGHT as u32)
     .unwrap();
