@@ -59,6 +59,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5c8214115b7bf84099f1309324e63141d4c5d7cc26862f97a0a857dbefe165bd"
 
 [[package]]
+name = "bytemuck"
+version = "1.22.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b6b1fc10dbac614ebc03540c9dbd60e83887fda27794998c6528f1782047d540"
+
+[[package]]
 name = "cc"
 version = "1.2.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -181,6 +187,7 @@ checksum = "42703706b716c37f96a77aea830392ad231f44c9e9a67872fa5548707e11b11c"
 name = "game"
 version = "0.1.0"
 dependencies = [
+ "bytemuck",
  "raylib",
  "rayon",
 ]
