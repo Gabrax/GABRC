@@ -3,36 +3,82 @@ use std::path::Path;
 
 use raylib::prelude::*;
 
-use crate::Player;     
+use crate::Player;
+
+#[derive(Clone)]
+pub struct Sprite {
+    pub x: f64,
+    pub y: f64,
+    pub texture: i32,
+}
 
 #[derive(Clone)]
 pub struct GameMap {
     pub size: usize,
     pub map_data: Vec<u8>,
+    pub sprites: Vec<Sprite>,
 }
 
 impl GameMap {
-    pub fn load_from_file(file_path: &str) -> Self {
+    pub fn load_map(file_path: &str) -> Self {
         let content = fs::read_to_string(Path::new(file_path))
             .expect("Failed to read level file");
 
-        let lines: Vec<&str> = content.lines().collect();
-        let size = lines.len(); 
+        let mut lines = content.lines();
+        let mut map_data = Vec::new();
+        let mut sprites = Vec::new();
+        let mut size = 0;
 
-        let map_data: Vec<u8> = lines
-            .iter()
-            .flat_map(|line| {
-                line.split(',')
-                    .filter_map(|n| n.trim().parse::<u8>().ok()) 
-            })
-            .collect();
+        while let Some(line) = lines.next() {
+            if line.starts_with("[MAP_DATA]") {
+                for map_line in lines.by_ref() {
+                    if map_line.trim().is_empty() || map_line.starts_with("[") {
+                        break;
+                    }
+                    let row: Vec<u8> = map_line
+                        .split(',')
+                        .filter_map(|n| n.trim().parse::<u8>().ok())
+                        .collect();
+
+                    if size == 0 {
+                        size = row.len(); // Assume square map
+                    }
+
+                    map_data.extend(row);
+                }
+            } else if line.starts_with("[SPRITES_DATA]") {
+                for sprite_line in lines.by_ref() {
+                    if sprite_line.trim().is_empty() || sprite_line.starts_with("[") {
+                        break;
+                    }
+                    
+                    let values: Vec<f64> = sprite_line
+                        .replace("{", "")
+                        .replace("}", "")
+                        .split(',')
+                        .filter_map(|n| n.trim().parse::<f64>().ok())
+                        .collect();
+
+                    if values.len() == 3 {
+                        sprites.push(Sprite {
+                            x: values[0],
+                            y: values[1],
+                            texture: values[2] as i32,
+                        });
+                    }
+                }
+            }
+        }
 
         assert_eq!(map_data.len(), size * size, "Map data is not a perfect square!");
 
-        GameMap { size, map_data }
+        GameMap {
+            size,
+            map_data,
+            sprites,
+        }
     }
 }
-
 pub fn draw_board(d: &mut RaylibDrawHandle, _player: &Player, _map: &GameMap) {
     let tile_size = 20; 
     let mut y_offset = 0; 
@@ -65,4 +111,3 @@ pub fn draw_board(d: &mut RaylibDrawHandle, _player: &Player, _map: &GameMap) {
     let player_y_offset = _player.pos.y as i32 * tile_size;
     d.draw_text("P", player_x_offset, player_y_offset, 6, Color::RED); 
 }
-

@@ -1,32 +1,40 @@
 use std::rc::Rc;
 use std::cell::RefCell;
 use raylib::prelude::*;
-use std::thread;
-use std::sync::{Arc, Mutex};
 
 use crate::Player;
 use crate::GameMap;
 
-pub struct Raycaster {
-    pub buffer_width: i32,
-    pub buffer_height: i32,
-    pub player: Rc<RefCell<Player>>,   
-    pub textures: Vec<Rc<RefCell<Image>>>,  
-    pub _map: Rc<RefCell<GameMap>>,    
+pub struct Raycaster
+{
+    buffer_width: i32,
+    buffer_height: i32,
+    player: Rc<RefCell<Player>>,   
+    textures: Vec<Rc<RefCell<Image>>>,  
+    _map: Rc<RefCell<GameMap>>,    
     pixelbuffer: Vec<u32>,
     _framebuffer: RenderTexture2D,
+    z_buffer: Vec<f64>,
+    sprite_order: Vec<i32>,
+    sprite_distance: Vec<f64>
 }
 
-impl Raycaster {
-    pub fn new(
+impl Raycaster
+{
+    pub fn new
+    (
         screen_width: i32,
         screen_height: i32,
         _framebuffer: RenderTexture2D,
         player: Rc<RefCell<Player>>,
         textures: Vec<Rc<RefCell<Image>>>,  // Use Rc<RefCell<Image>> for mutable access
-        _map: Rc<RefCell<GameMap>>,
-    ) -> Self {
+        _map: Rc<RefCell<GameMap>>
+    ) -> Self
+    {
         let pixelbuffer = vec![0; (screen_width * screen_height) as usize];
+        let z_buffer = vec![0.0; screen_width as usize]; // Stores depth values for each column
+        let sprite_order = Vec::new(); // Will store indices of sorted sprites
+        let sprite_distance = Vec::new(); // Will store distances of sprites from player
 
         Raycaster {
             buffer_width: screen_width,
@@ -36,12 +44,16 @@ impl Raycaster {
             textures,
             _map,
             _framebuffer,
+            z_buffer,
+            sprite_order,
+            sprite_distance
         }
     }
 
     pub fn render_all(&mut self, d: &mut RaylibDrawHandle) {
         self.render_floor_ceiling();
         self.render_walls();
+        self.render_sprites();
 
         self._framebuffer
             .texture_mut()
@@ -57,14 +69,27 @@ impl Raycaster {
         );
     }
 
-    pub fn color_to_u32(color: Color) -> u32 {
+    fn color_to_u32(color: Color) -> u32 {
         // Swap red and blue channels for BGRA format
         ((color.a as u32) << 24) | ((color.b as u32) << 16) | ((color.g as u32) << 8) | (color.r as u32)
     }
 
+    fn sort_sprites(order: &mut [i32], dist: &mut [f64]) {
+        let mut sprites: Vec<(f64, i32)> = order.iter().zip(dist.iter()).map(|(&o, &d)| (d, o)).collect();
+
+        // Sort in descending order based on distance
+        sprites.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
+
+        // Restore sorted values back into the arrays
+        for (i, (d, o)) in sprites.iter().enumerate() {
+            dist[i] = *d;
+            order[i] = *o;
+        }
+    }
+
     pub fn render_floor_ceiling(&mut self) {
-        let mut floor_texture = self.textures[3].borrow_mut();  // Borrow the image immutably
-        let mut ceiling_texture = self.textures[6].borrow_mut();  // Borrow the image immutably
+        let mut floor_texture = self.textures[6].borrow_mut();  // Borrow the image immutably
+        let mut ceiling_texture = self.textures[1].borrow_mut();  // Borrow the image immutably
 
         let player = self.player.borrow();
 
@@ -199,6 +224,74 @@ impl Raycaster {
 
                 // Store the pixel in the buffer
                 self.pixelbuffer[(y * self.buffer_width + x) as usize] = Self::color_to_u32(color);
+            }
+
+            self.z_buffer[x as usize] = dperp as f64; 
+        }
+    }
+
+    fn render_sprites(&mut self) {
+        let sprites = self._map.borrow();
+        let vec = &sprites.sprites;
+        let player = self.player.borrow();
+        let pos = player.pos;
+
+        self.sprite_order.resize(vec.len(), 0);
+        self.sprite_distance.resize(vec.len(), 0.0);
+
+        for (i, item) in vec.iter().enumerate() {
+            self.sprite_order[i] = i as i32;
+            self.sprite_distance[i] = (pos.x as f64 - item.x).powi(2) + (pos.y as f64 - item.y).powi(2);
+        }
+
+        Self::sort_sprites(&mut self.sprite_order, &mut self.sprite_distance);
+
+        let w = self.buffer_width as f32;
+        let h = self.buffer_height as f32;
+
+        for i in 0..vec.len() {
+            let sprite = &vec[self.sprite_order[i] as usize];
+            let mut texture = self.textures[sprite.texture as usize].borrow_mut();
+            let tex_width = texture.width;
+            let tex_height = texture.height;
+
+            let sprite_x = sprite.x as f32 - pos.x;
+            let sprite_y = sprite.y as f32 - pos.y;
+
+            let inv_det = 1.0 / (player.projection.x * player.dir.y - player.dir.x * player.projection.y);
+            let transform_x = inv_det * (player.dir.y * sprite_x - player.dir.x * sprite_y);
+            let transform_y = inv_det * (-player.projection.y * sprite_x + player.projection.x * sprite_y);
+
+            if transform_y <= 0.0 {
+                continue; // Skip sprites behind the player
+            }
+
+            let sprite_screen_x = ((w / 2.0) * (1.0 + transform_x / transform_y)).round() as i32;
+            let sprite_height = (h / transform_y).abs() as i32;
+            let v_move_screen = 0;
+
+            let draw_start_y = (-sprite_height / 2 + self.buffer_height / 2 ).clamp(0, self.buffer_height);
+            let draw_end_y = (sprite_height / 2 + self.buffer_height / 2 ).clamp(0, self.buffer_height - 1);
+
+            let sprite_width = (h / transform_y).abs() as i32;
+            let draw_start_x = (-sprite_width / 2 + sprite_screen_x).clamp(0, self.buffer_width);
+            let draw_end_x = (sprite_width / 2 + sprite_screen_x).clamp(0, self.buffer_width);
+
+            for stripe in draw_start_x..draw_end_x {
+                let tex_x = (((stripe - (-sprite_width / 2 + sprite_screen_x)) * tex_width) / sprite_width).clamp(0, tex_width - 1);
+
+                if transform_y > 0.0 && (stripe as usize) < self.z_buffer.len() && (transform_y as f64) < self.z_buffer[stripe as usize] {
+                    for y in draw_start_y..draw_end_y {
+                        let d = (y - v_move_screen) * 256 - (self.buffer_height * 128) + (sprite_height * 128);
+                        let tex_y = tex_height - 1 - ((d * tex_height) / sprite_height / 256).clamp(0, tex_height - 1);
+
+                        let color = texture.get_color(tex_x, tex_y);
+                        if color.a > 0 && !(color.r == 0 && color.g == 0 && color.b == 0) {
+                            let buffer_index = (y * self.buffer_width + stripe) as usize;
+                            self.pixelbuffer[buffer_index] = Self::color_to_u32(color);
+                        }
+                    }
+                }
             }
         }
     }

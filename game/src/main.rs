@@ -12,12 +12,12 @@ use crate::gamemap::draw_board;
 mod raycaster;
 use raycaster::Raycaster;
 
-const BUFFER_WIDTH: i32 = 384;
-const BUFFER_HEIGHT: i32 = 216;
+const BUFFER_WIDTH: i32 = 550;
+const BUFFER_HEIGHT: i32 = 350;
 
 fn main() {
     let (mut rl, thread) = raylib::init()
-        .size(1280, 720)
+        .size(1024, 768)
         .title("Raycasting with Rust")
         .vsync()
         .build();
@@ -45,7 +45,7 @@ fn main() {
         .map(|&path| Rc::new(RefCell::new(Image::load_image(path).expect("Failed to load texture"))))
         .collect();
 
-    let game_map = Rc::new(RefCell::new(GameMap::load_from_file("res/level_1.txt")));
+    let game_map = Rc::new(RefCell::new(GameMap::load_map("res/level_1.txt")));
 
     let player = Rc::new(RefCell::new(Player::new(game_map.clone())));
     let _framebuffer = rl
