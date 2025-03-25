@@ -2,6 +2,7 @@ use std::rc::Rc;
 use std::cell::RefCell;
 use raylib::prelude::*;
 
+use rand::random;
 use crate::Player;
 use crate::GameMap;
 
@@ -53,7 +54,11 @@ impl Raycaster
     pub fn render_all(&mut self, d: &mut RaylibDrawHandle) {
         self.render_floor_ceiling();
         self.render_walls();
-        self.render_sprites();
+        self.render_sprites(d);
+
+        let mut sprites = self._map.borrow_mut();
+        let vec = &mut sprites.sprites;
+        vec.retain(|sprite| sprite.is_destroyed == 0.0);
 
         self._framebuffer
             .texture_mut()
@@ -87,7 +92,7 @@ impl Raycaster
         }
     }
 
-    pub fn render_floor_ceiling(&mut self) {
+    fn render_floor_ceiling(&mut self) {
         let mut floor_texture = self.textures[6].borrow_mut();  // Borrow the image immutably
         let mut ceiling_texture = self.textures[1].borrow_mut();  // Borrow the image immutably
 
@@ -132,7 +137,7 @@ impl Raycaster
     }
 
 
-    pub fn render_walls(&mut self) {
+    fn render_walls(&mut self) {
         let player = self.player.borrow();
         let _map = self._map.borrow();
 
@@ -222,7 +227,6 @@ impl Raycaster
 
                 let color = texture.get_color(tex_x, tex_y);
 
-                // Store the pixel in the buffer
                 self.pixelbuffer[(y * self.buffer_width + x) as usize] = Self::color_to_u32(color);
             }
 
@@ -230,9 +234,11 @@ impl Raycaster
         }
     }
 
-    fn render_sprites(&mut self) {
-        let sprites = self._map.borrow();
-        let vec = &sprites.sprites;
+    fn render_sprites(&mut self,d: &mut RaylibDrawHandle) {
+        let mut sprites = self._map.borrow_mut();
+        let map_size = sprites.size;
+        let _map_data = sprites.map_data.clone();
+        let vec = &mut sprites.sprites;
         let player = self.player.borrow();
         let pos = player.pos;
 
@@ -250,7 +256,39 @@ impl Raycaster
         let h = self.buffer_height as f32;
 
         for i in 0..vec.len() {
-            let sprite = &vec[self.sprite_order[i] as usize];
+            let sprite_index = self.sprite_order[i] as usize;
+            let sprite = &mut vec[sprite_index]; // Mutable reference
+
+            if sprite.is_projectile == 1.0 {
+                let dir_x = sprite.dir_x;
+                let dir_y = sprite.dir_y;
+
+                // Normalize direction
+                let length = (dir_x * dir_x + dir_y * dir_y).sqrt();
+                if length != 0.0 {
+                    // Add noise to the direction vector to introduce more deviation
+                    let noise_x = (random::<f32>() - 0.5) * 0.2; // Adjust the multiplier for more/less noise
+                    let noise_y = (random::<f32>() - 0.5) * 0.2;
+
+                    // Apply the noise to the direction components
+                    let vx = (dir_x / length + noise_x as f64) * 0.1;
+                    let vy = (dir_y /length + noise_y as f64) * 0.1;
+
+                    let dt = d.get_time().clamp(0.0, 1.0); 
+
+                    sprite.x += vx * dt; 
+                    sprite.y += vy * dt;
+
+                    let grid_x = sprite.x as usize; 
+                    let grid_y = sprite.y as usize;
+
+                    let index = grid_y * map_size + grid_x; 
+
+                    if index < _map_data.len() && _map_data[index] != 0 {
+                        sprite.is_destroyed = 1.0; 
+                    }
+                }
+            }
             let mut texture = self.textures[sprite.texture as usize].borrow_mut();
             let tex_width = texture.width;
             let tex_height = texture.height;

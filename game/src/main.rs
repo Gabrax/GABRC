@@ -38,6 +38,8 @@ fn main() {
         "res/pillar.png",
         "res/greenlight.png",
         "res/chomik.png",
+        "res/demon.png",
+        "res/bullet.png"
     ];
 
     let textures: Vec<Rc<RefCell<Image>>> = texture_files

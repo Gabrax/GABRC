@@ -9,6 +9,12 @@ use crate::Player;
 pub struct Sprite {
     pub x: f64,
     pub y: f64,
+    pub vx: f64, // Velocity in X direction
+    pub vy: f64, // Velocity in Y direction
+    pub dir_x: f64, // Velocity in Y direction
+    pub dir_y: f64, // Velocity in Y direction
+    pub is_projectile: f64,
+    pub is_destroyed: f64,
     pub texture: i32,
 }
 
@@ -59,11 +65,17 @@ impl GameMap {
                         .filter_map(|n| n.trim().parse::<f64>().ok())
                         .collect();
 
-                    if values.len() == 3 {
+                    if values.len() == 9 {
                         sprites.push(Sprite {
                             x: values[0],
                             y: values[1],
-                            texture: values[2] as i32,
+                            vx: values[2],
+                            vy: values[3],
+                            dir_x: values[4], // Velocity in Y direction
+                            dir_y: values[5], // Velocity in Y direction
+                            is_projectile: values[6],
+                            is_destroyed: values[7],
+                            texture: values[8] as i32,
                         });
                     }
                 }

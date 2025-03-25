@@ -3,6 +3,7 @@ use std::rc::Rc;
 use std::cell::RefCell;
 
 use crate::GameMap;
+use crate::gamemap::Sprite;
 
 #[derive(Clone)]
 pub struct Player {
@@ -10,7 +11,7 @@ pub struct Player {
     pub dir: Vector2,
     pub projection: Vector2,
     movespeed: f32,
-    pub _map: Rc<RefCell<GameMap>>,
+    _map: Rc<RefCell<GameMap>>,
 }
 
 impl Player {
@@ -37,6 +38,10 @@ impl Player {
 
         self.rotate(-_rl.get_mouse_delta().x * 0.003);
 
+        if _rl.is_mouse_button_pressed(MouseButton::MOUSE_BUTTON_LEFT) {
+            self.shoot(_rl);
+        }
+
         if _rl.is_key_down(KeyboardKey::KEY_W) {
             let new_pos = Vector2::new(self.pos.x + self.dir.x * self.movespeed, self.pos.y + self.dir.y * self.movespeed);
             if self.is_valid_move(new_pos) {
@@ -61,6 +66,24 @@ impl Player {
                 self.pos = new_pos;
             }
         }
+    }
+
+    fn shoot(&mut self, _rl: &mut RaylibDrawHandle) {
+        let mut map = self._map.borrow_mut();
+
+        let bullet = Sprite {
+            x: self.pos.x as f64,
+            y: self.pos.y as f64,
+            vx: 0.0,
+            vy: 0.0,
+            dir_x: self.dir.x as f64,
+            dir_y: self.dir.y as f64,
+            is_projectile: 1.0,
+            is_destroyed: 0.0,
+            texture: 13,
+        };
+
+        map.sprites.push(bullet);
     }
 
     fn is_valid_move(&self, new_pos: Vector2) -> bool {
