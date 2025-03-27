@@ -12,6 +12,9 @@ pub struct Player {
     pub projection: Vector2,
     movespeed: f32,
     _map: Rc<RefCell<GameMap>>,
+    is_shooting: bool,
+    sprite_index: usize,
+    frame_counter: usize
 }
 
 impl Player {
@@ -21,25 +24,85 @@ impl Player {
             let len = (v.x * v.x + v.y * v.y).sqrt();
             Vector2::new(v.x / len, v.y / len)
         };
+
+
+        let mut map = _map.borrow_mut();
+
+        let shotgun_sprite = Sprite {
+            x: 2.0,
+            y: 2.0,
+            vx: 0.0,
+            vy: 0.0,
+            dir_x: dir.x as f64,
+            dir_y: dir.y as f64,
+            is_projectile: 0.0,
+            is_ui: 1.0,
+            is_destroyed: 0.0,
+            texture: 17,
+        };
+
+        let sprite_index = map.sprites.len();
+        map.sprites.push(shotgun_sprite);
         
         let mut player = Player {
             pos: Vector2::new(2.0, 2.0),
             dir,
             projection: Vector2::new(0.0, 0.66),
             movespeed: 3.0 * 0.016,
-            _map,
+            _map: _map.clone(),
+            is_shooting: false,
+            sprite_index,
+            frame_counter: 0,
         };
         
         player.rotate(180.0);
         player
     }
 
-    pub fn update(&mut self,_rl: &mut RaylibDrawHandle) {
+    pub fn update(&mut self, _rl: &mut RaylibDrawHandle) {
+        self.frame_counter += 1;
+
+        let mut spawn_bullet = None; // Store bullet separately
+
+        {
+            let mut map = self._map.borrow_mut();
+            if let Some(sprite) = map.sprites.get_mut(self.sprite_index) {
+                if self.is_shooting && self.frame_counter % 10 == 0 {
+                    sprite.texture += 1;
+
+                    if sprite.texture == 19 {
+                        spawn_bullet = Some(Sprite {
+                            x: self.pos.x as f64,
+                            y: self.pos.y as f64,
+                            vx: 0.0,
+                            vy: 0.0,
+                            dir_x: self.dir.x as f64,
+                            dir_y: self.dir.y as f64,
+                            is_projectile: 1.0,
+                            is_ui: 0.0,
+                            is_destroyed: 0.0,
+                            texture: 12,
+                        });
+                    }
+
+                    if sprite.texture > 18 + 6 {
+                        sprite.texture = 17;
+                        self.is_shooting = false;
+                    }
+                }
+            }
+        } // `_map` borrow is dropped here
+
+        // Now that `_map` is no longer borrowed, we can safely push the bullet
+        if let Some(bullet) = spawn_bullet {
+            let mut map = self._map.borrow_mut();
+            map.sprites.push(bullet);
+        }
 
         self.rotate(-_rl.get_mouse_delta().x * 0.003);
 
         if _rl.is_mouse_button_pressed(MouseButton::MOUSE_BUTTON_LEFT) {
-            self.shoot(_rl);
+            self.shoot();
         }
 
         if _rl.is_key_down(KeyboardKey::KEY_W) {
@@ -68,25 +131,25 @@ impl Player {
         }
     }
 
-    fn shoot(&mut self, _rl: &mut RaylibDrawHandle) {
+    fn shoot(&mut self) {
+        if self.is_shooting {
+            return; // Prevent shooting again until animation resets
+        }
+
+        self.is_shooting = true;
+        self.frame_counter = 0; // Reset animation counter
+
         let mut map = self._map.borrow_mut();
-
-        let bullet = Sprite {
-            x: self.pos.x as f64,
-            y: self.pos.y as f64,
-            vx: 0.0,
-            vy: 0.0,
-            dir_x: self.dir.x as f64,
-            dir_y: self.dir.y as f64,
-            is_projectile: 1.0,
-            is_ui: 0.0,
-            is_destroyed: 0.0,
-            texture: 12,
-        };
-
-        map.sprites.push(bullet);
+        if let Some(sprite) = map.sprites.get_mut(self.sprite_index) {
+            sprite.texture = 17; // Start animation from the first frame
+        }
     }
 
+    fn spawn_bullet(&mut self) {
+        let mut map = self._map.borrow_mut();
+
+        
+    }
     fn is_valid_move(&self, new_pos: Vector2) -> bool {
         let map = self._map.borrow();
         // Check if the new position is within bounds

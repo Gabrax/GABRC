@@ -256,7 +256,7 @@ impl Raycaster
         let w = self.buffer_width as f32;
         let h = self.buffer_height as f32;
 
-        let mut projectile_ui_index = 0;
+        let mut sprite_ui_index = 0;
 
         for i in 0..vec.len() {
             let sprite_index = self.sprite_order[i] as usize;
@@ -297,33 +297,33 @@ impl Raycaster
                 }
             }
 
-            //if sprite.is_projectile == 1.0 {
-            //    // Define position for the projectile UI on the right side of the screen
-            //    let screen_x = (w * 0.85) as i32; // Right side of the screen
-            //    // Use i32 for the Y position, casting the index safely
-            //    let screen_y = (h * 0.1 + (projectile_ui_index as f32 * (tex_height as f32 + 5.0))) as i32;
-            //    projectile_ui_index += 1;
-            //
-            //    // Iterate over the sprite texture
-            //    for y in 0..tex_height {
-            //        for x in 0..tex_width {
-            //            let color = texture.get_color(x, y);
-            //            if color.a > 0 { // Ignore transparent pixels
-            //                let pixel_x = screen_x + x;
-            //                let pixel_y = screen_y + y;
-            //
-            //                // Ensure coordinates are within the buffer's bounds
-            //                if pixel_x >= 0 && pixel_x < self.buffer_width &&
-            //                   pixel_y >= 0 && pixel_y < self.buffer_height {
-            //                    // Convert to buffer index and set the pixel color
-            //                    let buffer_index = pixel_y as usize * self.buffer_width as usize + pixel_x as usize;
-            //                    self.pixelbuffer[buffer_index] = Self::color_to_u32(color);
-            //                }
-            //            }
-            //        }
-            //    }
-            //    continue; // Skip 3D rendering for this projectile
-            //}
+            if sprite.is_ui == 1.0 {
+                // Define position for the projectile UI on the right side of the screen
+                let screen_x = (w * 0.25) as i32; // Right side of the screen
+                // Use i32 for the Y position, casting the index safely
+                let screen_y = (h * 0.001 + (sprite_ui_index as f32 * (tex_height as f32 + 5.0))) as i32;
+                sprite_ui_index += 1;
+
+                // Iterate over the sprite texture
+                for y in 0..tex_height {
+                    for x in 0..tex_width {
+                        let color = texture.get_color(x, tex_height - 1 - y);
+                        if color.a > 0 { // Ignore transparent pixels
+                            let pixel_x = screen_x + x;
+                            let pixel_y = screen_y + y;
+
+                            // Ensure coordinates are within the buffer's bounds
+                            if pixel_x >= 0 && pixel_x < self.buffer_width &&
+                               pixel_y >= 0 && pixel_y < self.buffer_height {
+                                // Convert to buffer index and set the pixel color
+                                let buffer_index = pixel_y as usize * self.buffer_width as usize + pixel_x as usize;
+                                self.pixelbuffer[buffer_index] = Self::color_to_u32(color);
+                            }
+                        }
+                    }
+                }
+                continue; // Skip 3D rendering for this projectile
+            }
 
 
             let sprite_x = sprite.x as f32 - pos.x;
