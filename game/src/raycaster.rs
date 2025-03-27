@@ -4,6 +4,7 @@ use raylib::prelude::*;
 
 use rand::random;
 use crate::Player;
+use crate::Enemy;
 use crate::GameMap;
 
 pub struct Raycaster
@@ -189,7 +190,7 @@ impl Raycaster
             let texture_index = match hit.0 {
                 1 => 0,  // Texture for wall type 1
                 2 => 4,  // Texture for wall type 2
-                3 => 11, // Texture for wall type 3
+                3 => 7, // Texture for wall type 3
                 4 => 2,  // Texture for wall type 4
                 _ => 0,  // Default texture
             };

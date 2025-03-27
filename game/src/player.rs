@@ -80,7 +80,7 @@ impl Player {
             dir_y: self.dir.y as f64,
             is_projectile: 1.0,
             is_destroyed: 0.0,
-            texture: 13,
+            texture: 12,
         };
 
         map.sprites.push(bullet);

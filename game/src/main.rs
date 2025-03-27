@@ -5,6 +5,9 @@ use std::cell::RefCell;
 mod player;
 use player::Player;
 
+mod enemy;
+use enemy::Enemy;
+
 mod gamemap;
 use gamemap::GameMap;
 use crate::gamemap::draw_board;
@@ -37,7 +40,6 @@ fn main() {
         "res/barrel.png",
         "res/pillar.png",
         "res/greenlight.png",
-        "res/chomik.png",
         "res/demon.png",
         "res/bullet.png"
     ];
@@ -50,6 +52,7 @@ fn main() {
     let game_map = Rc::new(RefCell::new(GameMap::load_map("res/level_1.txt")));
 
     let player = Rc::new(RefCell::new(Player::new(game_map.clone())));
+    let enemy = Rc::new(RefCell::new(Enemy::new(game_map.clone())));
     let _framebuffer = rl
     .load_render_texture(&thread, BUFFER_WIDTH as u32, BUFFER_HEIGHT as u32)
     .unwrap();
