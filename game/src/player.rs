@@ -79,6 +79,7 @@ impl Player {
             dir_x: self.dir.x as f64,
             dir_y: self.dir.y as f64,
             is_projectile: 1.0,
+            is_ui: 0.0,
             is_destroyed: 0.0,
             texture: 12,
         };

@@ -41,7 +41,19 @@ fn main() {
         "res/pillar.png",
         "res/greenlight.png",
         "res/demon.png",
-        "res/bullet.png"
+        "res/bullet.png",
+        "res/enemy1.png",
+        "res/enemy2.png",
+        "res/enemy3.png",
+        "res/enemy4.png",
+        "res/shotgun1.png",
+        "res/shotgun2.png",
+        "res/shotgun3.png",
+        "res/shotgun4.png",
+        "res/shotgun5.png",
+        "res/shotgun6.png",
+        "res/shotgun7.png",
+        "res/shotgun8.png",
     ];
 
     let textures: Vec<Rc<RefCell<Image>>> = texture_files
@@ -71,6 +83,7 @@ fn main() {
 
         raycaster.render_all(&mut d);
         player.borrow_mut().update(&mut d);
+        enemy.borrow_mut().update();
 
         draw_board(&mut d, &player.borrow(), &game_map.borrow());
         d.draw_fps(15, 0);
